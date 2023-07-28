@@ -1,0 +1,37 @@
+package {{ .PackageName }}
+
+import (
+	"context"
+	_ "embed"
+
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/swaggo/swag"
+	"google.golang.org/grpc"
+)
+
+type ServiceRegistrar interface {
+	GetContext() context.Context
+	GetGrpcServiceRegistrar() grpc.ServiceRegistrar
+	GetGrpcChannelClient() grpc.ClientConnInterface
+	GetServeMux() *runtime.ServeMux
+}
+
+//go:embed {{ .PackageName }}.swagger.json
+var swaggerJson string
+
+type swaggerImpl struct{}
+
+func (s *swaggerImpl) ReadDoc() string {
+	return swaggerJson
+}
+
+func RegisterSwag() {
+    swag.Register(swag.Name, &swaggerImpl{})
+}
+{{range $ServiceName := .Services}}
+func Register{{ $ServiceName }}WithGrpcAndHttp(reg ServiceRegistrar, srv {{ $ServiceName }}Server) {
+	Register{{ $ServiceName }}Server(reg.GetGrpcServiceRegistrar(), srv)
+	_ = Register{{ $ServiceName }}HandlerClient(reg.GetContext(), reg.GetServeMux(), New{{ $ServiceName }}Client(reg.GetGrpcChannelClient()))
+}
+
+{{end}}
